@@ -28,6 +28,7 @@ internal sealed class TrayApp : ApplicationContext
     private readonly DesktopStateCache _desktops;
     private readonly ForegroundCoordinator _foreground;
     private readonly WindowPinner _pinner;
+    private readonly WindowSpreader _spreader;
     private bool _enabled = true;
 
     public TrayApp(IClock? clock = null, IScreens? screens = null)
@@ -49,7 +50,9 @@ internal sealed class TrayApp : ApplicationContext
         _overview.Warmup();
         _foreground = new ForegroundCoordinator(_canvas, _overview, _input, _clock, _screens);
         _pinner = new WindowPinner(_canvas, _wm, winApi);
+        _spreader = new WindowSpreader(_canvas, _wm, _screens);
         _input.PinHotkey += OnPinHotkey;
+        _input.SpreadHotkey += OnSpreadHotkey;
         _desktops = new DesktopStateCache(_canvas, _wm, _overview, _vds);
 
         // Constructed last so they can self-subscribe to canvas/input/desktops events.
@@ -98,6 +101,12 @@ internal sealed class TrayApp : ApplicationContext
         _pinner.TogglePinForeground();
     }
 
+    private void OnSpreadHotkey()
+    {
+        if (!_enabled) return;
+        _spreader.SpreadCurrentViewport();
+    }
+
     private void OnToggle(object? sender, EventArgs e)
     {
         _enabled = !_enabled;
@@ -121,6 +130,7 @@ internal sealed class TrayApp : ApplicationContext
     private void OnExit(object? sender, EventArgs e)
     {
         _input.PinHotkey -= OnPinHotkey;
+        _input.SpreadHotkey -= OnSpreadHotkey;
         _bgTimer.Stop();
         _bgTimer.Dispose();
         _input.Dispose();
