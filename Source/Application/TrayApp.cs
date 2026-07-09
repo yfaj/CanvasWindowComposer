@@ -49,6 +49,7 @@ internal sealed class TrayApp : ApplicationContext
         _overview = new OverviewManager(_canvas, _wm, winApi, _input, _screens);
         _overview.Warmup();
         _glider = new AnimatedCameraGlider(_canvas, _wm, _screens, _input, _overview, _clock);
+        _overview.PromoteGlider = _glider;
         _foreground = new ForegroundCoordinator(_canvas, _overview, _input, _clock, _screens, _glider);
         _pinner = new WindowPinner(_canvas, _wm, winApi);
         _input.PinHotkey += OnPinHotkey;

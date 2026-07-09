@@ -28,6 +28,17 @@ internal sealed class OverviewManager : IDisposable, IOverviewController
     private const double ExtentsPaddingRatio = 0.1;
     private const double MouseWheelDeltaPerNotch = 120.0;
 
+    // Movement (in virtual px) below which a press-release in Zooming counts as
+    // a click (promote to focus) rather than a window drag.
+    private const int ClickDragThresholdPx = 5;
+
+    /// <summary>
+    /// Optional animator used to glide the main canvas to a window when it is
+    /// promoted from the overview (click / Enter). When null, the camera snaps.
+    /// Set by the composition root after construction to avoid a cycle.
+    /// </summary>
+    public ICameraGlider? PromoteGlider { get; set; }
+
     private readonly InertiaTracker _inertia = new();
     private readonly object _inertiaQueueLock = new();
     private int _pendingInertiaDx, _pendingInertiaDy;
@@ -66,6 +77,8 @@ internal sealed class OverviewManager : IDisposable, IOverviewController
     private bool _draggingWindow;
     private int _dragIndex = -1;
     private int _dragStartVx, _dragStartVy;
+    private int _dragDownVx, _dragDownVy;
+    private bool _windowMoved;
 
     public OverviewManager(Canvas mainCanvas, WindowManager wm, IWindowApi win32, IInputRouter input, IScreens? screens = null)
     {
@@ -462,6 +475,9 @@ internal sealed class OverviewManager : IDisposable, IOverviewController
                 _dragIndex = 0;
                 _dragStartVx = vx;
                 _dragStartVy = vy;
+                _dragDownVx = vx;
+                _dragDownVy = vy;
+                _windowMoved = false;
                 return;
             }
 
@@ -490,6 +506,10 @@ internal sealed class OverviewManager : IDisposable, IOverviewController
             double dy = (vy - _dragStartVy) / _camera.Zoom;
             _dragStartVx = vx;
             _dragStartVy = vy;
+
+            if (Math.Abs(vx - _dragDownVx) > ClickDragThresholdPx ||
+                Math.Abs(vy - _dragDownVy) > ClickDragThresholdPx)
+                _windowMoved = true;
 
             _windows.TranslateAt(_dragIndex, dx, dy);
             var entry = _windows.Windows[_dragIndex];
@@ -522,9 +542,22 @@ internal sealed class OverviewManager : IDisposable, IOverviewController
     {
         if (_draggingWindow)
         {
-            _wm.Reproject(true);
+            bool wasClick = !_windowMoved;
+            int index = _dragIndex;
             _draggingWindow = false;
             _dragIndex = -1;
+
+            // A click (negligible movement) promotes the window to focus;
+            // an actual drag just commits the new position.
+            if (wasClick && index >= 0 && index < _windows.Count)
+            {
+                var entry = _windows.Windows[index];
+                GoToWindow(entry.HWnd, entry.World);
+            }
+            else
+            {
+                _wm.Reproject(true);
+            }
         }
         _panning = false;
     }
@@ -569,10 +602,21 @@ internal sealed class OverviewManager : IDisposable, IOverviewController
         if (_mainCanvas.IsCollapsed(hWnd))
             PInvoke.ShowWindow((HWND)hWnd, SHOW_WINDOW_CMD.SW_RESTORE);
 
-        var vs = _screens.VirtualScreen;
-        _mainCanvas.CenterOn(world.X, world.Y, world.W, world.H, vs.Width, vs.Height);
         PInvoke.SetForegroundWindow((HWND)hWnd);
-        TransitionTo(OverviewMode.Hidden, syncCameraOnClose: false);
+
+        if (PromoteGlider != null)
+        {
+            // Close without syncing the camera, then glide the main canvas
+            // from where it was to the promoted window at normal zoom.
+            TransitionTo(OverviewMode.Hidden, syncCameraOnClose: false);
+            PromoteGlider.GlideTo(world.X, world.Y, world.W, world.H);
+        }
+        else
+        {
+            var vs = _screens.VirtualScreen;
+            _mainCanvas.CenterOn(world.X, world.Y, world.W, world.H, vs.Width, vs.Height);
+            TransitionTo(OverviewMode.Hidden, syncCameraOnClose: false);
+        }
     }
 
     public void Dispose()
