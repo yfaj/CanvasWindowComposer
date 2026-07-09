@@ -43,6 +43,11 @@ internal sealed class Win32WindowApi : IWindowApi
         return (rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top);
     }
 
+    public IntPtr GetForegroundWindow()
+    {
+        return PInvoke.GetForegroundWindow();
+    }
+
     public unsafe (int left, int top, int right, int bottom) GetFrameInset(IntPtr hWnd)
     {
         PInvoke.GetWindowRect((HWND)hWnd, out RECT full);

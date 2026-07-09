@@ -4,19 +4,23 @@ using System.Windows.Forms;
 namespace CanvasDesktop;
 
 /// <summary>
-/// Single hidden NativeWindow that handles WM_HOTKEY (Alt+S search, Alt+Q overview).
+/// Single hidden NativeWindow that handles WM_HOTKEY (Alt+S search, Alt+Q
+/// overview, Alt+P pin).
 /// </summary>
 internal sealed class MessageWindow : NativeWindow, IDisposable
 {
     private const int HOTKEY_SEARCH = 1;
     private const int HOTKEY_OVERVIEW = 2;
     private const int HOTKEY_ESCAPE = 3;
+    private const int HOTKEY_PIN = 4;
     private const uint VK_S = 0x53;
     private const uint VK_Q = 0x51;
+    private const uint VK_P = 0x50;
     private const uint VK_ESCAPE = 0x1B;
 
     private Action? _onSearchHotkey;
     private Action? _onOverviewHotkey;
+    private Action? _onPinHotkey;
     private Action? _onEscHotkey;
     private bool _escRegistered;
 
@@ -25,10 +29,12 @@ internal sealed class MessageWindow : NativeWindow, IDisposable
         CreateHandle(new CreateParams());
     }
 
-    public void RegisterHandlers(Action? onSearchHotkey, Action? onOverviewHotkey)
+    public void RegisterHandlers(Action? onSearchHotkey, Action? onOverviewHotkey,
+        Action? onPinHotkey = null)
     {
         _onSearchHotkey = onSearchHotkey;
         _onOverviewHotkey = onOverviewHotkey;
+        _onPinHotkey = onPinHotkey;
 
         // A null callback means "don't register the hotkey" — leaves it free
         // for other apps. Driven by DisableSearch / DisableZoomHotkey config.
@@ -37,6 +43,8 @@ internal sealed class MessageWindow : NativeWindow, IDisposable
             PInvoke.RegisterHotKey((HWND)Handle, HOTKEY_SEARCH, modifiers, VK_S);
         if (onOverviewHotkey != null)
             PInvoke.RegisterHotKey((HWND)Handle, HOTKEY_OVERVIEW, modifiers, VK_Q);
+        if (onPinHotkey != null)
+            PInvoke.RegisterHotKey((HWND)Handle, HOTKEY_PIN, modifiers, VK_P);
     }
 
     /// <summary>
@@ -75,6 +83,9 @@ internal sealed class MessageWindow : NativeWindow, IDisposable
                 case HOTKEY_OVERVIEW:
                     _onOverviewHotkey?.Invoke();
                     return;
+                case HOTKEY_PIN:
+                    _onPinHotkey?.Invoke();
+                    return;
                 case HOTKEY_ESCAPE:
                     _onEscHotkey?.Invoke();
                     return;
@@ -88,6 +99,7 @@ internal sealed class MessageWindow : NativeWindow, IDisposable
     {
         PInvoke.UnregisterHotKey((HWND)Handle, HOTKEY_SEARCH);
         PInvoke.UnregisterHotKey((HWND)Handle, HOTKEY_OVERVIEW);
+        PInvoke.UnregisterHotKey((HWND)Handle, HOTKEY_PIN);
         if (_escRegistered)
             PInvoke.UnregisterHotKey((HWND)Handle, HOTKEY_ESCAPE);
         DestroyHandle();
