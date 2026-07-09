@@ -26,6 +26,7 @@ internal sealed class TrayApp : ApplicationContext
     private readonly OverviewManager _overview;
     private readonly Win32InputRouter _input;
     private readonly DesktopStateCache _desktops;
+    private readonly AnimatedCameraGlider _glider;
     private readonly ForegroundCoordinator _foreground;
     private bool _enabled = true;
 
@@ -46,7 +47,8 @@ internal sealed class TrayApp : ApplicationContext
         _wm = new WindowManager(_canvas, winApi, _config, _input, _clock, _vds, useAsyncProjection: true);
         _overview = new OverviewManager(_canvas, _wm, winApi, _input, _screens);
         _overview.Warmup();
-        _foreground = new ForegroundCoordinator(_canvas, _overview, _input, _clock, _screens);
+        _glider = new AnimatedCameraGlider(_canvas, _wm, _screens, _input, _overview, _clock);
+        _foreground = new ForegroundCoordinator(_canvas, _overview, _input, _clock, _screens, _glider);
         _desktops = new DesktopStateCache(_canvas, _wm, _overview, _vds);
 
         // Constructed last so they can self-subscribe to canvas/input/desktops events.
@@ -113,6 +115,7 @@ internal sealed class TrayApp : ApplicationContext
     {
         _bgTimer.Stop();
         _bgTimer.Dispose();
+        _glider.Dispose();
         _input.Dispose();
         _wm.Reset();
         _wm.Dispose();

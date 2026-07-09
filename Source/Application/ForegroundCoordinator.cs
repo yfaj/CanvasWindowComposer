@@ -17,6 +17,7 @@ internal sealed class ForegroundCoordinator
     private readonly IOverviewController _overview;
     private readonly IClock _clock;
     private readonly IScreens _screens;
+    private readonly ICameraGlider? _glider;
 
     private long _lastWindowLostTick;
     private long _lastOverlayClosedTick;
@@ -26,12 +27,14 @@ internal sealed class ForegroundCoordinator
         IOverviewController overview,
         IInputRouter input,
         IClock clock,
-        IScreens screens)
+        IScreens screens,
+        ICameraGlider? glider = null)
     {
         _canvas = canvas;
         _overview = overview;
         _clock = clock;
         _screens = screens;
+        _glider = glider;
 
         overview.BeforeModeChanged += OnOverviewModeChanged;
 
@@ -72,9 +75,16 @@ internal sealed class ForegroundCoordinator
             var r = _canvas.WorldToScreen(world);
             if (!IsOnAnyScreen(r))
             {
-                var screen = _screens.PrimaryWorkingArea;
-                _canvas.CenterOn(world.X, world.Y, world.W, world.H, screen.Width, screen.Height);
-                _canvas.Commit();
+                if (_glider != null)
+                {
+                    _glider.GlideTo(world.X, world.Y, world.W, world.H);
+                }
+                else
+                {
+                    var screen = _screens.PrimaryWorkingArea;
+                    _canvas.CenterOn(world.X, world.Y, world.W, world.H, screen.Width, screen.Height);
+                    _canvas.Commit();
+                }
             }
         }
     }
