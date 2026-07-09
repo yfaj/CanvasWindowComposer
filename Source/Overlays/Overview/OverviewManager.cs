@@ -80,6 +80,8 @@ internal sealed class OverviewManager : IDisposable, IOverviewController
 
         Microsoft.Win32.SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
 
+        input.WindowFocused += OnWindowFocused;
+
         // Reference held only to keep the binding alive for the lifetime of this manager.
         _ = new OverviewInputs(this, input, mainCanvas);
     }
@@ -110,6 +112,26 @@ internal sealed class OverviewManager : IDisposable, IOverviewController
 
         if (wasVisible)
             TransitionTo(prev);
+    }
+
+    private void OnWindowFocused(IntPtr hWnd)
+    {
+        if (CurrentMode == OverviewMode.Hidden) return;
+
+        // Don't reassert for topmost windows (e.g. MyDockFinder) —
+        // they should stay above the overlay.
+        int exStyle = PInvoke.GetWindowLong((HWND)hWnd, WINDOW_LONG_PTR_INDEX.GWL_EXSTYLE);
+        if ((exStyle & (int)WINDOW_EX_STYLE.WS_EX_TOPMOST) != 0)
+            return;
+
+        // Overview form itself getting focus is fine.
+        foreach (var p in _passes)
+        {
+            if (p.IsHandleCreated && p.Handle == hWnd)
+                return;
+        }
+
+        ReassertZOrder();
     }
 
     /// <summary>Pre-initialize D3D11 and grid threads on every monitor.</summary>
@@ -227,6 +249,19 @@ internal sealed class OverviewManager : IDisposable, IOverviewController
         foreach (var p in _passes)
             p.Grid?.UpdateCamera(_camera.X, _camera.Y, _camera.Zoom);
         _thumbnails.Reconcile();
+
+        ReassertZOrder();
+    }
+
+    private void ReassertZOrder()
+    {
+        foreach (var p in _passes)
+        {
+            if (p.IsHandleCreated)
+                PInvoke.SetWindowPos((HWND)p.Handle, (HWND)0, 0, 0, 0, 0,
+                    SET_WINDOW_POS_FLAGS.SWP_NOMOVE | SET_WINDOW_POS_FLAGS.SWP_NOSIZE |
+                    SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE);
+        }
     }
 
     /// <summary>Single entry point for every mode change.</summary>
@@ -267,11 +302,10 @@ internal sealed class OverviewManager : IDisposable, IOverviewController
         _thumbnails.Show();
 
         ApplyConfig();
+        ReassertZOrder();
 
         foreach (var p in _passes)
-        {
             p.Show();
-        }
         if (_passes.Count > 0) _passes[0].Activate();
 
         // Attach frame tick to the first pass's grid (drives inertia)
@@ -292,6 +326,7 @@ internal sealed class OverviewManager : IDisposable, IOverviewController
 
         if (syncCamera)
         {
+            _wm.SuspendProjection = true;
             var (vx, vy) = _camera.ViewportCamera;
             _mainCanvas.SetCamera(vx, vy);
         }

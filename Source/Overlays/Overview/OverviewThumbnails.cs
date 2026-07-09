@@ -589,15 +589,10 @@ internal sealed class OverviewThumbnails
                 int sw = Math.Max(1, (int)(world.W * zoom));
                 int sh = Math.Max(1, (int)(world.H * zoom));
 
-                int fL = (int)(entry.InsetL * zoom);
-                int fT = (int)(entry.InsetT * zoom);
-                int fR = (int)(entry.InsetR * zoom);
-                int fB = (int)(entry.InsetB * zoom);
-
-                int left   = sx + fL - pass.OriginX;
-                int top    = sy + fT - pass.OriginY;
-                int right  = sx + sw - fR - pass.OriginX;
-                int bottom = sy + sh - fB - pass.OriginY;
+                int left   = sx - pass.OriginX;
+                int top    = sy - pass.OriginY;
+                int right  = sx + sw - pass.OriginX;
+                int bottom = sy + sh - pass.OriginY;
 
                 var props = new DWM_THUMBNAIL_PROPERTIES
                 {

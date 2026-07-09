@@ -50,7 +50,6 @@ internal sealed class OverviewOverlay : Form
         FormBorderStyle = FormBorderStyle.None;
         StartPosition = FormStartPosition.Manual;
         ShowInTaskbar = false;
-        TopMost = true;
         BackColor = Color.FromArgb(15, 15, 15);
         DoubleBuffered = true;
         KeyPreview = true;
@@ -71,6 +70,11 @@ internal sealed class OverviewOverlay : Form
         Size = new Size(b.Width, b.Height);
 
         _ = Handle; // force HWND creation
+
+        // Place at top of normal z-order but below topmost windows
+        // so overlays like MyDockFinder remain visible.
+        PInvoke.SetWindowPos((HWND)Handle, (HWND)0, 0, 0, 0, 0,
+            SET_WINDOW_POS_FLAGS.SWP_NOMOVE | SET_WINDOW_POS_FLAGS.SWP_NOSIZE | SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE);
 
         if (Grid == null)
         {

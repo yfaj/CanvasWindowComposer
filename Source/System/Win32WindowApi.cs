@@ -17,6 +17,10 @@ internal sealed class Win32WindowApi : IWindowApi
         _screens = screens ?? WinFormsScreens.Instance;
     }
 
+    // Cache of process PIDs looked up for process-name exclusion — avoids
+    // creating a Process object per window on every tick.
+    private readonly Dictionary<uint, string?> _procNameByPid = new();
+
     private static readonly HashSet<string> ExcludedClasses = new()
     {
         "Progman",
@@ -25,6 +29,15 @@ internal sealed class Win32WindowApi : IWindowApi
         "Shell_SecondaryTrayWnd",
         "NotifyIconOverflowWindow",
         "Windows.UI.Core.CoreWindow"
+    };
+
+    private static readonly HashSet<string> ExcludedProcessNames = new()
+    {
+        "opencode",
+        "Mydock",
+        "Dockmod",
+        "Dockmod64",
+        "Dock_64",
     };
 
     public bool IsWindowVisible(IntPtr hWnd)
@@ -142,6 +155,23 @@ internal sealed class Win32WindowApi : IWindowApi
         string className = new string(classBuf[..classLen]);
         if (ExcludedClasses.Contains(className))
             return false;
+
+        // Process-name exclusion (cached per PID)
+        if (ExcludedProcessNames.Count > 0)
+        {
+            if (!_procNameByPid.TryGetValue(pid, out var pname))
+            {
+                try
+                {
+                    using var proc = Process.GetProcessById((int)pid);
+                    pname = proc.ProcessName;
+                }
+                catch { pname = null; }
+                _procNameByPid[pid] = pname;
+            }
+            if (pname != null && ExcludedProcessNames.Contains(pname))
+                return false;
+        }
 
         return true;
     }
