@@ -30,6 +30,9 @@ internal interface IInputRouter
     /// <summary>Raised on Alt+P: toggle pin (screen-anchor) on the foreground window.</summary>
     event Action? PinHotkey;
 
+    /// <summary>Raised on Alt+G: auto-spread managed windows into a grid.</summary>
+    event Action? SpreadHotkey;
+
     /// <summary>
     /// Raised when the user presses Esc while the Esc hotkey is enabled.
     /// Esc is registered/unregistered on demand (via <see cref="EnableEscHotkey"/>
