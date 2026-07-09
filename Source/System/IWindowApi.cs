@@ -17,6 +17,9 @@ internal interface IWindowApi
     bool IsWindowVisible(IntPtr hWnd);
     int GetWindowStyle(IntPtr hWnd);
     (int x, int y, int w, int h) GetWindowRect(IntPtr hWnd);
+
+    /// <summary>The currently focused top-level window, or <see cref="IntPtr.Zero"/>.</summary>
+    IntPtr GetForegroundWindow();
     (int left, int top, int right, int bottom) GetFrameInset(IntPtr hWnd);
     uint GetWindowProcessId(IntPtr hWnd);
     string GetWindowTitle(IntPtr hWnd);
@@ -29,6 +32,13 @@ internal interface IWindowApi
 
     // Filtering
     bool IsManageable(IntPtr hWnd, uint ownPid, bool allowMinimized = false);
+
+    /// <summary>
+    /// True when the shell taskbar is in auto-hide mode (ABS_AUTOHIDE). Used to
+    /// keep the overview from drawing a taskbar thumbnail the user has chosen to
+    /// keep hidden.
+    /// </summary>
+    bool IsTaskbarAutoHidden();
 
     // Mutation
     void SetWindowPosition(IntPtr hWnd, int x, int y, int w, int h, uint flags);

@@ -17,10 +17,6 @@ internal sealed class Win32WindowApi : IWindowApi
         _screens = screens ?? WinFormsScreens.Instance;
     }
 
-    // Cache of process PIDs looked up for process-name exclusion — avoids
-    // creating a Process object per window on every tick.
-    private readonly Dictionary<uint, string?> _procNameByPid = new();
-
     private static readonly HashSet<string> ExcludedClasses = new()
     {
         "Progman",
@@ -29,15 +25,6 @@ internal sealed class Win32WindowApi : IWindowApi
         "Shell_SecondaryTrayWnd",
         "NotifyIconOverflowWindow",
         "Windows.UI.Core.CoreWindow"
-    };
-
-    private static readonly HashSet<string> ExcludedProcessNames = new()
-    {
-        "opencode",
-        "Mydock",
-        "Dockmod",
-        "Dockmod64",
-        "Dock_64",
     };
 
     public bool IsWindowVisible(IntPtr hWnd)
@@ -54,6 +41,11 @@ internal sealed class Win32WindowApi : IWindowApi
     {
         PInvoke.GetWindowRect((HWND)hWnd, out RECT rect);
         return (rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top);
+    }
+
+    public IntPtr GetForegroundWindow()
+    {
+        return PInvoke.GetForegroundWindow();
     }
 
     public unsafe (int left, int top, int right, int bottom) GetFrameInset(IntPtr hWnd)
@@ -135,6 +127,14 @@ internal sealed class Win32WindowApi : IWindowApi
             (exStyle & (int)WINDOW_EX_STYLE.WS_EX_APPWINDOW) == 0)
             return false;
 
+        // Always-on-top windows (docks like MyDockFinder, widgets, pinned
+        // players) are treated as fixed desktop furniture: never panned and
+        // never given an overview thumbnail. They render for real above the
+        // (non-topmost) overview overlay, so a thumbnail would double them.
+        // Generic by design — no per-process allow/deny list.
+        if ((exStyle & (int)WINDOW_EX_STYLE.WS_EX_TOPMOST) != 0)
+            return false;
+
         if (PInvoke.GetParent(h) != HWND.Null)
             return false;
 
@@ -156,24 +156,35 @@ internal sealed class Win32WindowApi : IWindowApi
         if (ExcludedClasses.Contains(className))
             return false;
 
-        // Process-name exclusion (cached per PID)
-        if (ExcludedProcessNames.Count > 0)
-        {
-            if (!_procNameByPid.TryGetValue(pid, out var pname))
-            {
-                try
-                {
-                    using var proc = Process.GetProcessById((int)pid);
-                    pname = proc.ProcessName;
-                }
-                catch { pname = null; }
-                _procNameByPid[pid] = pname;
-            }
-            if (pname != null && ExcludedProcessNames.Contains(pname))
-                return false;
-        }
-
         return true;
+    }
+
+    // SHAppBarMessage(ABM_GETSTATE) returns the shell appbar (taskbar) state
+    // bitmask; ABS_AUTOHIDE (0x1) is set when auto-hide is enabled. Declared by
+    // hand because CsWin32 refuses to generate SHAppBarMessage / APPBARDATA for
+    // an AnyCPU target (PInvoke005 — the shell API is arch-specific).
+    private const uint ABM_GETSTATE = 0x00000004;
+    private const int ABS_AUTOHIDE = 0x00000001;
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct APPBARDATA
+    {
+        public uint cbSize;
+        public IntPtr hWnd;
+        public uint uCallbackMessage;
+        public uint uEdge;
+        public int rcLeft, rcTop, rcRight, rcBottom;
+        public IntPtr lParam;
+    }
+
+    [System.Runtime.InteropServices.DllImport("shell32.dll")]
+    private static extern UIntPtr SHAppBarMessage(uint dwMessage, ref APPBARDATA pData);
+
+    public unsafe bool IsTaskbarAutoHidden()
+    {
+        var data = new APPBARDATA { cbSize = (uint)sizeof(APPBARDATA) };
+        UIntPtr state = SHAppBarMessage(ABM_GETSTATE, ref data);
+        return ((int)(ulong)state & ABS_AUTOHIDE) != 0;
     }
 
     public void SetWindowPosition(IntPtr hWnd, int x, int y, int w, int h, uint flags)
