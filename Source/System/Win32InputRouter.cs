@@ -40,6 +40,7 @@ internal sealed class Win32InputRouter : IInputRouter, IDisposable
     public event Action? ButtonDown;
     public event Action? SearchHotkey;
     public event Action? OverviewHotkey;
+    public event Action? PinHotkey;
     public event Action? EscPressed;
 
     public void EnableEscHotkey()
@@ -67,7 +68,8 @@ internal sealed class Win32InputRouter : IInputRouter, IDisposable
         _msgWindow = new MessageWindow();
         _msgWindow.RegisterHandlers(
             onSearchHotkey:   config.DisableSearch     ? null : () => SearchHotkey?.Invoke(),
-            onOverviewHotkey: config.DisableZoomHotkey ? null : () => OverviewHotkey?.Invoke());
+            onOverviewHotkey: config.DisableZoomHotkey ? null : () => OverviewHotkey?.Invoke(),
+            onPinHotkey:      () => PinHotkey?.Invoke());
 
         _winEvents = new Win32EventRouter();
         _winEvents.WindowMinimized += h => WindowMinimized?.Invoke(h);

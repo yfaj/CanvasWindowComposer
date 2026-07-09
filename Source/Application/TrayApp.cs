@@ -28,6 +28,7 @@ internal sealed class TrayApp : ApplicationContext
     private readonly DesktopStateCache _desktops;
     private readonly AnimatedCameraGlider _glider;
     private readonly ForegroundCoordinator _foreground;
+    private readonly WindowPinner _pinner;
     private bool _enabled = true;
 
     public TrayApp(IClock? clock = null, IScreens? screens = null)
@@ -50,6 +51,8 @@ internal sealed class TrayApp : ApplicationContext
         _glider = new AnimatedCameraGlider(_canvas, _wm, _screens, _input, _overview, _clock);
         _overview.PromoteGlider = _glider;
         _foreground = new ForegroundCoordinator(_canvas, _overview, _input, _clock, _screens, _glider);
+        _pinner = new WindowPinner(_canvas, _wm, winApi);
+        _input.PinHotkey += OnPinHotkey;
         _desktops = new DesktopStateCache(_canvas, _wm, _overview, _vds);
 
         // Constructed last so they can self-subscribe to canvas/input/desktops events.
@@ -92,6 +95,12 @@ internal sealed class TrayApp : ApplicationContext
         _wm.Tick();
     }
 
+    private void OnPinHotkey()
+    {
+        if (!_enabled) return;
+        _pinner.TogglePinForeground();
+    }
+
     private void OnToggle(object? sender, EventArgs e)
     {
         _enabled = !_enabled;
@@ -114,6 +123,7 @@ internal sealed class TrayApp : ApplicationContext
 
     private void OnExit(object? sender, EventArgs e)
     {
+        _input.PinHotkey -= OnPinHotkey;
         _bgTimer.Stop();
         _bgTimer.Dispose();
         _glider.Dispose();

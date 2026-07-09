@@ -10,6 +10,16 @@ internal struct WorldRect
     public double X, Y, W, H;
     public WindowState State;
     public long ZOrder;
+
+    /// <summary>
+    /// When true, the window is anchored to a fixed screen rectangle
+    /// (<see cref="PinX"/>..<see cref="PinH"/>) and does NOT track the camera —
+    /// it stays put while the canvas pans/zooms (PiP-style). Distinct from the
+    /// always-on-top "fixed furniture" rule, which drops such windows from
+    /// management entirely; a pinned window is still managed.
+    /// </summary>
+    public bool Pinned;
+    public int PinX, PinY, PinW, PinH;
 }
 
 /// <summary>Screen-space projection of a <see cref="WorldRect"/>.</summary>
@@ -197,6 +207,7 @@ internal sealed class Canvas
         foreach (var (hWnd, r) in _windows)
         {
             if (r.State != WindowState.Normal) continue;
+            if (r.Pinned) continue;
             any = true;
             if (r.X < minX) minX = r.X;
             if (r.Y < minY) minY = r.Y;
@@ -292,6 +303,50 @@ internal sealed class Canvas
         r.ZOrder = ++_foregroundCounter;
         _windows[hWnd] = r;
         FrontChanged?.Invoke(hWnd);
+    }
+
+    // ==================== PIN ====================
+
+    /// <summary>Raised when a window is pinned or unpinned.</summary>
+    public event Action<IntPtr>? PinChanged;
+
+    public bool IsPinned(IntPtr hWnd)
+    {
+        return _windows.TryGetValue(hWnd, out var r) && r.Pinned;
+    }
+
+    /// <summary>
+    /// Anchor a window to a fixed screen rectangle so it no longer tracks the
+    /// camera. Records the rect it should hold. No-op if untracked.
+    /// </summary>
+    public void PinWindow(IntPtr hWnd, int screenX, int screenY, int screenW, int screenH)
+    {
+        if (!_windows.TryGetValue(hWnd, out var r)) return;
+        r.Pinned = true;
+        r.PinX = screenX; r.PinY = screenY; r.PinW = screenW; r.PinH = screenH;
+        _windows[hWnd] = r;
+        PinChanged?.Invoke(hWnd);
+    }
+
+    /// <summary>Update the anchored screen rect of an already-pinned window (e.g. the user dragged it).</summary>
+    public void UpdatePinRect(IntPtr hWnd, int screenX, int screenY, int screenW, int screenH)
+    {
+        if (!_windows.TryGetValue(hWnd, out var r) || !r.Pinned) return;
+        r.PinX = screenX; r.PinY = screenY; r.PinW = screenW; r.PinH = screenH;
+        _windows[hWnd] = r;
+    }
+
+    /// <summary>
+    /// Release a pin and drop the window back onto the canvas at the given
+    /// world position (typically its current screen rect mapped to world).
+    /// </summary>
+    public void UnpinWindow(IntPtr hWnd, double worldX, double worldY, double worldW, double worldH)
+    {
+        if (!_windows.TryGetValue(hWnd, out var r)) return;
+        r.Pinned = false;
+        r.X = worldX; r.Y = worldY; r.W = worldW; r.H = worldH;
+        _windows[hWnd] = r;
+        PinChanged?.Invoke(hWnd);
     }
 
 }
