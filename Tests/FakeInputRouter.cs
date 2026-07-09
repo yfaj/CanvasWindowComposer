@@ -11,6 +11,7 @@ internal sealed class FakeInputRouter : IInputRouter
     public event Action? SearchHotkey;
     public event Action? OverviewHotkey;
     public event Action? PinHotkey;
+    public event Action? SpreadHotkey;
     public event Action? EscPressed;
 
     public int EnableEscHotkeyCalls;
@@ -136,6 +137,11 @@ internal sealed class FakeInputRouter : IInputRouter
     public void RaisePinHotkey()
     {
         PinHotkey?.Invoke();
+    }
+
+    public void RaiseSpreadHotkey()
+    {
+        SpreadHotkey?.Invoke();
     }
 
     public void RaiseWindowMinimized(IntPtr h)
