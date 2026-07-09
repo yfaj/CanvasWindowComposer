@@ -230,6 +230,21 @@ internal sealed class WindowManager : IDisposable
             if (world.State != WindowState.Normal)
                 continue;
 
+            // Pinned: anchored to a fixed screen rect, ignores the camera and
+            // is never clipped (it's meant to stay visible while you pan/zoom).
+            if (world.Pinned)
+            {
+                if (_clippedWindows.Contains(hWnd))
+                {
+                    _win32.UnclipWindow(hWnd);
+                    _clippedWindows.Remove(hWnd);
+                }
+                var pinned = new WindowRect(world.PinX, world.PinY, world.PinW, world.PinH);
+                batch.Add(new BatchMoveItem(hWnd, pinned, PosOnly: false));
+                _lastScreen[hWnd] = (world.PinX, world.PinY, world.PinW, world.PinH);
+                continue;
+            }
+
             var r = _canvas.WorldToScreen(world);
             bool onScreen = IsOnAnyScreen(r.X, r.Y, r.W, r.H);
 
@@ -340,6 +355,15 @@ internal sealed class WindowManager : IDisposable
         // care where the app thinks they are
         if (_clippedWindows.Contains(hWnd))
             return;
+
+        // Pinned windows are screen-anchored, so a user move updates the pin
+        // rect (where it should stay), not a world position.
+        if (_canvas.IsPinned(hWnd))
+        {
+            _canvas.UpdatePinRect(hWnd, ax, ay, aw, ah);
+            _lastScreen[hWnd] = (ax, ay, aw, ah);
+            return;
+        }
 
         _canvas.SetWindowFromScreen(hWnd, ax, ay, aw, ah);
         _lastScreen[hWnd] = (ax, ay, aw, ah);

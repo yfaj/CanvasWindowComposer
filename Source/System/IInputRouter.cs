@@ -27,6 +27,9 @@ internal interface IInputRouter
     event Action? SearchHotkey;
     event Action? OverviewHotkey;
 
+    /// <summary>Raised on Alt+P: toggle pin (screen-anchor) on the foreground window.</summary>
+    event Action? PinHotkey;
+
     /// <summary>
     /// Raised when the user presses Esc while the Esc hotkey is enabled.
     /// Esc is registered/unregistered on demand (via <see cref="EnableEscHotkey"/>
