@@ -71,6 +71,9 @@ internal sealed class FakeWindowApi : IWindowApi
         return w.Manageable;
     }
 
+    public bool TaskbarAutoHidden { get; set; }
+    public bool IsTaskbarAutoHidden() => TaskbarAutoHidden;
+
     public void SetWindowPosition(IntPtr hWnd, int x, int y, int w, int h, uint flags)
     {
         SetPositionCalls.Add((hWnd, x, y, w, h, flags));
