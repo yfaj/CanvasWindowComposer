@@ -45,6 +45,12 @@ internal sealed class OverviewThumbnails
     private int _lastDesktopOpacity = -1;
     private bool? _lastTaskbarsVisible;
 
+    // Snapshot of the shell taskbar's auto-hide state, captured on Show. When
+    // the taskbar auto-hides the user keeps it off-screen, so we never draw its
+    // thumbnail in the overview. Auto-hide is a static setting for the session,
+    // so a per-open snapshot is enough (no per-frame shell round-trip).
+    private bool _taskbarAutoHidden;
+
     // UpdateWindowRects early-out: cache last-pushed camera. Same camera + same
     // world rects => same screen rects, so skip the per-window DWM push loop.
     // Use InvalidateCameraCache on paths that need a fresh push (new entries,
@@ -104,6 +110,7 @@ internal sealed class OverviewThumbnails
     /// <summary>Register desktop + taskbar thumbnails on every pass. Window thumbnails are registered lazily by <see cref="Reconcile"/>.</summary>
     public void Show()
     {
+        _taskbarAutoHidden = _win32.IsTaskbarAutoHidden();
         foreach (var pass in _passes)
         {
             RegisterDesktop(pass);
@@ -379,7 +386,7 @@ internal sealed class OverviewThumbnails
     /// </summary>
     private void UpdateTaskbars()
     {
-        bool visible = _state.CurrentConfig.TaskbarVisible;
+        bool visible = _state.CurrentConfig.TaskbarVisible && !_taskbarAutoHidden;
         if (_lastTaskbarsVisible == visible) return;
         _lastTaskbarsVisible = visible;
 

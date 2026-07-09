@@ -30,6 +30,13 @@ internal interface IWindowApi
     // Filtering
     bool IsManageable(IntPtr hWnd, uint ownPid, bool allowMinimized = false);
 
+    /// <summary>
+    /// True when the shell taskbar is in auto-hide mode (ABS_AUTOHIDE). Used to
+    /// keep the overview from drawing a taskbar thumbnail the user has chosen to
+    /// keep hidden.
+    /// </summary>
+    bool IsTaskbarAutoHidden();
+
     // Mutation
     void SetWindowPosition(IntPtr hWnd, int x, int y, int w, int h, uint flags);
     void ClipWindow(IntPtr hWnd);
